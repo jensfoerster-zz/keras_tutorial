@@ -21,6 +21,15 @@ from keras.callbacks import ModelCheckpoint
 
 # pylint: disable=line-too-long
 
+LOGDIR = "logs"
+def check_and_create_dir(directory_name):
+    if os.path.exists(directory_name) is False:
+        try:
+            os.makedirs(directory_name)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
 def load_pima_data(current_filepath=None):
     print "..loading pima indians dataset"
     dataset = pd.DataFrame.from_dict([])
@@ -51,7 +60,7 @@ def run_nn(x_train_set, x_test_set, y_train_set, y_test_set, n_neurons, n_epochs
 
     if history:
         print "..training with history"
-        filepath = "logs/nn_weights_%dneurons-{epoch:02d}.hdf5" % n_neurons
+        filepath = "%s/nn_weights_%dneurons-{epoch:02d}.hdf5" % (LOGDIR, n_neurons)
         checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=0,
                                      save_weights_only=True,
                                      save_best_only=False, mode='max')
@@ -69,7 +78,7 @@ def run_nn(x_train_set, x_test_set, y_train_set, y_test_set, n_neurons, n_epochs
         test_over_time = []
         for i in range(len(output['loss'])):
             adj_i = i + 1
-            current_filepath = "logs/nn_weights_%dneurons-%02d.hdf5" % (n_neurons, adj_i)
+            current_filepath = "%s/nn_weights_%dneurons-%02d.hdf5" % (LOGDIR, n_neurons, adj_i)
             temp_val_model.load_weights(current_filepath)
             scores = temp_val_model.evaluate(x_test_set, y_test_set, verbose=0)
             test_over_time.append(scores)
@@ -163,29 +172,31 @@ def plot_this_3(nn_output_unscaled, nn_output_scaled, save_to_file_name):
     plt.savefig(save_to_file_name, dpi=200)
 
 def main():
+    # initialization stuff
     datestring = datetime.now().strftime("%Y%m%d-%H%M%S")
-    
+    check_and_create_dir(LOGDIR)
+
     # load data
     x_train, x_test, y_train, y_test = load_pima_data()
-    
+
     # initial run
     nn_output = run_nn(x_train, x_test, y_train, y_test, 1000, 1000)
-    plot_this(nn_output, "logs/%s_plot_1 _plain.png" % datestring)
+    plot_this(nn_output, "%s/%s_plot_1 _plain.png" % (LOGDIR, datestring))
 
     # run with scaled data
     scaler = StandardScaler()
     nn_output_scaled = run_nn(scaler.fit_transform(x_train),
                               scaler.fit_transform(x_test),
                               y_train, y_test, 1000, 1000)
-    plot_this_2(nn_output, nn_output_scaled, "logs/%s_plot_2_scaled.png" % datestring)
+    plot_this_2(nn_output, nn_output_scaled, "%s/%s_plot_2_scaled.png" % (LOGDIR, datestring))
 
     # run with scaled data and stop criteria
     early_stop_crit = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=0, mode='auto')
     nn_output_stop = run_nn(x_train, x_test, y_train, y_test, 1000, 1000,
                             validation_split=0.2, early_stopping=early_stop_crit)
     nn_output_stop_scaled = run_nn(scaler.fit_transform(x_train), scaler.fit_transform(x_test),
-                                    y_train, y_test, 1000, 1000,validation_split=0.2, early_stopping=early_stop_crit)
-    plot_this_3(nn_output_stop, nn_output_stop_scaled, "logs/%s_plot_3_scaledstop.png" % datestring)
+                                   y_train, y_test, 1000, 1000, validation_split=0.2, early_stopping=early_stop_crit)
+    plot_this_3(nn_output_stop, nn_output_stop_scaled, "%s/%s_plot_3_scaledstop.png" % (LOGDIR, datestring))
 
 
 if __name__ == '__main__':
